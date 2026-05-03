@@ -335,7 +335,10 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = Query(
     try:
         while True:
             data = await websocket.receive_text()
-            # Echo or handle ping/pong / typing indicators here if needed
+            if data == "ping":
+                await websocket.send_text("pong")
+                continue
+            # Handle other messages (typing etc) here
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception:
