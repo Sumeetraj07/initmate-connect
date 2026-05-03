@@ -301,7 +301,6 @@ class ConnectionManager:
         self.active_connections: list[WebSocket] = []
 
     async def connect(self, websocket: WebSocket):
-        await websocket.accept()
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
@@ -319,7 +318,10 @@ manager = ConnectionManager()
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = Query(default=None)):
-    # Validate token — reject unauthenticated connections
+    # Accept immediately to avoid handshake timeouts/CORS issues during upgrade
+    await websocket.accept()
+    
+    # Validate token — close if unauthenticated
     if token:
         user_id = tokens_db.get(token)
         if not user_id or user_id not in users_db:
@@ -327,6 +329,9 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = Query(
             return
     
     await manager.connect(websocket)
+    # We don't call manager.connect(websocket) again because manager.connect already accepted it
+    # Oh wait, I see manager.connect also calls accept. Let's fix that too.
+
     try:
         while True:
             data = await websocket.receive_text()
