@@ -23,9 +23,20 @@ function LoginPage() {
     }
     try {
       await login(username.trim(), password);
-      navigate({ to: "/chat" });
-    } catch {
-      setError("Invalid credentials.");
+      const redirect = sessionStorage.getItem("redirect_after_login");
+      if (redirect) {
+        sessionStorage.removeItem("redirect_after_login");
+        navigateToRedirect(navigate, redirect);
+      } else {
+        navigate({ to: "/chat" });
+      }
+    } catch (err: any) {
+      const msg = err?.message || "";
+      if (msg.includes("401") || msg.toLowerCase().includes("invalid")) {
+        setError("Incorrect username or password.");
+      } else {
+        setError(msg || "Login failed. Is the server running?");
+      }
     }
   }
 
@@ -70,6 +81,25 @@ function LoginPage() {
       </p>
     </AuthShell>
   );
+}
+
+/**
+ * Utility: navigate to a saved redirect path after login/signup.
+ * Handles dynamic routes like /join/:id and /chat/:id properly.
+ */
+export function navigateToRedirect(navigate: ReturnType<typeof useNavigate>, path: string) {
+  const joinMatch = path.match(/^\/join\/([^/]+)$/);
+  if (joinMatch) {
+    navigate({ to: "/join/$conversationId", params: { conversationId: joinMatch[1] } });
+    return;
+  }
+  const chatMatch = path.match(/^\/chat\/([^/]+)$/);
+  if (chatMatch) {
+    navigate({ to: "/chat/$conversationId", params: { conversationId: chatMatch[1] } });
+    return;
+  }
+  // Fallback: navigate as raw path (safe for /chat, /login, etc.)
+  navigate({ to: path as any });
 }
 
 export function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {

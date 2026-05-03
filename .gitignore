@@ -20,6 +20,21 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Backend database (contains user data - never commit this)
+backend/db.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# Environment variables
+.env
+.env.local
+.env.production
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

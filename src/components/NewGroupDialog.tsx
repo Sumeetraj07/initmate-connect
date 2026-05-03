@@ -1,21 +1,39 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { X, Users } from "lucide-react";
+import { X, Users, RefreshCw } from "lucide-react";
 import { Avatar } from "./Avatar";
 import { api } from "@/lib/api";
 import type { Conversation, User } from "@/lib/types";
 
 interface Props {
-  users: User[];
+  currentUserId: string;
   onClose: () => void;
   onCreated: (c: Conversation) => void;
 }
 
-export function NewGroupDialog({ users, onClose, onCreated }: Props) {
+export function NewGroupDialog({ currentUserId, onClose, onCreated }: Props) {
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersError, setUsersError] = useState("");
+
+  async function loadUsers() {
+    setUsersLoading(true);
+    setUsersError("");
+    try {
+      const all = await api.listUsers();
+      setUsers(all.filter((u) => u.id !== currentUserId));
+    } catch (e: any) {
+      setUsersError(e.message || "Could not load users.");
+    } finally {
+      setUsersLoading(false);
+    }
+  }
+
+  useEffect(() => { loadUsers(); }, []);
 
   function toggle(id: string) {
     setSelected((s) => {
@@ -28,11 +46,12 @@ export function NewGroupDialog({ users, onClose, onCreated }: Props) {
   async function create() {
     setError("");
     if (!name.trim()) { setError("Name your group."); return; }
-    if (selected.size === 0) { setError("Add at least one member."); return; }
     setBusy(true);
     try {
       const c = await api.createGroup({ name: name.trim().slice(0, 60), memberIds: Array.from(selected) });
       onCreated(c);
+    } catch (err: any) {
+      setError(err.message || "Failed to create group.");
     } finally {
       setBusy(false);
     }
@@ -69,7 +88,24 @@ export function NewGroupDialog({ users, onClose, onCreated }: Props) {
         <div className="mt-4">
           <div className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Members</div>
           <div className="max-h-72 space-y-1 overflow-auto pr-1 scrollbar-thin">
-            {users.map((u) => {
+            {usersLoading && (
+              <div className="py-6 text-center text-sm text-muted-foreground animate-pulse">Loading users…</div>
+            )}
+            {!usersLoading && usersError && (
+              <div className="py-4 text-center">
+                <p className="text-sm text-destructive mb-2">{usersError}</p>
+                <button
+                  onClick={loadUsers}
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition"
+                >
+                  <RefreshCw className="h-3 w-3" /> Retry
+                </button>
+              </div>
+            )}
+            {!usersLoading && !usersError && users.length === 0 && (
+              <div className="py-6 text-center text-sm text-muted-foreground">No other users found.</div>
+            )}
+            {!usersLoading && users.map((u) => {
               const on = selected.has(u.id);
               return (
                 <button

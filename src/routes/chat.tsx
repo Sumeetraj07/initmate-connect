@@ -27,8 +27,8 @@ function ChatLayout() {
   const [showNewGroup, setShowNewGroup] = useState(false);
 
   useEffect(() => {
-    api.listConversations().then(setConversations);
-    api.listUsers().then(setUsers);
+    api.listConversations().then(setConversations).catch(() => {});
+    api.listUsers().then(setUsers).catch(() => {});
   }, []);
 
   function refresh() {
@@ -39,6 +39,32 @@ function ChatLayout() {
   useEffect(() => {
     refresh();
   }, [loc.pathname]);
+
+  // Live update sidebar via WebSocket
+  useEffect(() => {
+    api.connectWS();
+    const unsub = api.subscribeToEvents((event) => {
+      if (event.type === "new_message") {
+        setConversations((prev) => {
+          const updated = prev.map((c) => {
+            if (c.id === event.message.conversationId) {
+              const isActive = window.location.pathname === `/chat/${c.id}`;
+              return {
+                ...c,
+                lastMessageAt: event.message.createdAt,
+                lastPreview: event.message.kind === "text" ? event.message.content : `[${event.message.kind}]`,
+                unread: isActive ? 0 : (c.unread || 0) + 1,
+              };
+            }
+            return c;
+          });
+          // sort so latest is at the top
+          return updated.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+        });
+      }
+    });
+    return unsub;
+  }, []);
 
   if (!user) return null;
 
@@ -167,7 +193,7 @@ function ChatLayout() {
 
       {showNewGroup && (
         <NewGroupDialog
-          users={users.filter((u) => u.id !== user.id)}
+          currentUserId={user.id}
           onClose={() => setShowNewGroup(false)}
           onCreated={(c) => {
             setShowNewGroup(false);

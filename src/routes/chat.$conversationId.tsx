@@ -44,6 +44,20 @@ function ConversationView() {
     return () => { cancelled = true; };
   }, [conversationId]);
 
+  // Live updates via WebSocket
+  useEffect(() => {
+    api.connectWS();
+    const unsub = api.subscribeToEvents((event) => {
+      if (event.type === "new_message" && event.message.conversationId === conversationId) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === event.message.id)) return prev;
+          return [...prev, event.message];
+        });
+      }
+    });
+    return unsub;
+  }, [conversationId]);
+
   // Auto-scroll
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -184,12 +198,30 @@ function ConversationView() {
           </div>
         </div>
         {conversation.kind === "group" && (
-          <button
-            onClick={() => setShowSettings(true)}
-            className="rounded-full p-2 text-muted-foreground hover:bg-white/5 hover:text-foreground"
-          >
-            <MoreVertical className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => {
+                const url = `${window.location.origin}/join/${conversation.id}`;
+                if (navigator.clipboard && window.isSecureContext) {
+                  navigator.clipboard.writeText(url).then(() => {
+                    alert("Invite link copied to clipboard!");
+                  });
+                } else {
+                  prompt("Copy your invite link below:", url);
+                }
+              }}
+              className="rounded-full p-2 text-accent hover:bg-white/5"
+              title="Copy Invite Link"
+            >
+              <Users className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="rounded-full p-2 text-muted-foreground hover:bg-white/5 hover:text-foreground"
+            >
+              <MoreVertical className="h-5 w-5" />
+            </button>
+          </div>
         )}
       </header>
 

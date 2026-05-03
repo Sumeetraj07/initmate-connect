@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/useAuth";
-import { AuthShell, Field } from "./login";
+import { AuthShell, Field, navigateToRedirect } from "./login";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
@@ -36,9 +36,21 @@ function SignupPage() {
         email: form.email.trim(),
         password: form.password,
       });
-      navigate({ to: "/chat" });
-    } catch {
-      setError("Could not create account.");
+      const redirect = sessionStorage.getItem("redirect_after_login");
+      if (redirect) {
+        sessionStorage.removeItem("redirect_after_login");
+        navigateToRedirect(navigate, redirect);
+      } else {
+        navigate({ to: "/chat" });
+      }
+    } catch (err: any) {
+      // Parse the FastAPI error detail from the response body
+      let msg = err?.message || "";
+      try {
+        const parsed = JSON.parse(msg);
+        msg = parsed?.detail || msg;
+      } catch {}
+      setError(msg || "Could not create account. Is the server running?");
     }
   }
 
